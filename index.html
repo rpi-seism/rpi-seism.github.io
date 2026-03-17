@@ -1,1 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>rpi-seism — Open Source 3-Axis Seismograph</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Barlow:wght@300;400;500&family=Barlow+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:      #080b0e;
+      --surface: #0d1117;
+      --panel:   #111820;
+      --border:  #1c2a38;
+      --border2: #243040;
+      --text:    #b8ccd8;
+      --bright:  #deeaf2;
+      --dim:     #4a6070;
+      --green:   #1affa0;
+      --green2:  #0dc070;
+      --amber:   #ffaa40;
+      --blue:    #40aaff;
+      --red:     #ff5060;
+    }
 
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Barlow', sans-serif;
+      font-weight: 400;
+      font-size: 15px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.025) 3px, rgba(0,0,0,0.025) 4px);
+      pointer-events: none; z-index: 9000;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+      background: rgba(8,11,14,0.92);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .nav-inner {
+      max-width: 1280px; margin: 0 auto;
+      padding: 0 2.5rem; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .wordmark {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem; font-style: italic;
+      color: var(--green); letter-spacing: 0.06em;
+    }
+    .nav-links { display: flex; gap: 2.5rem; align-items: center; }
+    .nav-links a {
+      font-family: 'Space Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim);
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--bright); }
+    .nav-links a.gh {
+      color: var(--green); border: 1px solid var(--green2);
+      padding: 5px 14px;
+    }
+    .nav-links a.gh:hover { background: rgba(26,255,160,0.07); }
+
+    /* ─── SHARED LAYOUT ─── */
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 0 2.5rem; }
+
+    /* ─── BIG TITLE SYSTEM ─── */
+    .page-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: clamp(5rem, 12vw, 11rem);
+      line-height: 0.88;
+      letter-spacing: -0.03em;
+      text-transform: uppercase;
+      color: var(--bright);
+    }
+    .page-title .acc { color: var(--green); }
+
+    .sec-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: clamp(3.5rem, 8vw, 7rem);
+      line-height: 0.88;
+      letter-spacing: -0.03em;
+      text-transform: uppercase;
+      color: var(--bright);
+      margin-bottom: 1.5rem;
+    }
+
+    .sec-tag {
+      font-family: 'Space Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--green);
+      display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.25rem;
+    }
+    .sec-tag::before { content: '//'; color: var(--dim); }
+
+    .sec-intro {
+      color: var(--dim); font-size: 0.9rem;
+      max-width: 560px; line-height: 1.75; margin-bottom: 3rem;
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      align-items: center;
+      padding: 7rem 2.5rem 4rem;
+      max-width: 1280px; margin: 0 auto;
+      gap: 5rem;
+    }
+    .hero-tag {
+      font-family: 'Space Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--green);
+      display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2rem;
+    }
+    .hero-tag::before { content: ''; width: 28px; height: 1px; background: var(--green); }
+    .hero-sub {
+      font-size: 1rem; color: var(--dim); line-height: 1.8;
+      max-width: 500px; margin: 2rem 0 2.75rem;
+    }
+    .hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .btn-p {
+      font-family: 'Space Mono', monospace; font-size: 0.68rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      background: var(--green); color: #000;
+      padding: 0.7rem 1.6rem; transition: background 0.15s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-p:hover { background: #fff; }
+    .btn-s {
+      font-family: 'Space Mono', monospace; font-size: 0.68rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      border: 1px solid var(--border2); color: var(--dim);
+      padding: 0.7rem 1.6rem; transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-s:hover { border-color: var(--green); color: var(--green); }
+
+    /* ─── OSC PANEL ─── */
+    .osc-panel { background: var(--surface); border: 1px solid var(--border); }
+    .osc-header {
+      padding: 0.65rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .osc-lbl { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green); }
+    .osc-status { display: flex; align-items: center; gap: 0.5rem; font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--green); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 1.4s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+    .osc-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .osc-ch { display: grid; grid-template-columns: 2.5rem 1fr; align-items: center; gap: 0.75rem; }
+    .ch-id { font-family: 'Space Mono', monospace; font-size: 0.6rem; }
+    .osc-foot {
+      border-top: 1px solid var(--border);
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 1px; background: var(--border);
+    }
+    .ofc { background: var(--panel); padding: 0.5rem 0.9rem; }
+    .ofc-k { font-family: 'Space Mono', monospace; font-size: 0.55rem; color: var(--dim); margin-bottom: 2px; }
+    .ofc-v { font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--bright); }
+
+    /* ─── STATS BAR ─── */
+    .stats-bar {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: grid; grid-template-columns: repeat(5,1fr);
+    }
+    .stat-cell {
+      padding: 1.75rem 1.25rem; text-align: center;
+      border-right: 1px solid var(--border);
+      position: relative; cursor: default; transition: background 0.2s;
+    }
+    .stat-cell:last-child { border-right: none; }
+    .stat-cell:hover { background: var(--panel); }
+    .stat-cell::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--green); transform: scaleX(0); transition: transform 0.25s;
+    }
+    .stat-cell:hover::before { transform: scaleX(1); }
+    .stat-val {
+      font-family: 'Barlow Condensed', sans-serif; font-weight: 800;
+      font-size: 2.6rem; line-height: 1; color: var(--bright); letter-spacing: -0.02em;
+    }
+    .stat-val sup { font-size: 1rem; color: var(--green); font-weight: 700; letter-spacing: 0; }
+    .stat-key {
+      font-family: 'Space Mono', monospace; font-size: 0.56rem;
+      letter-spacing: 0.15em; text-transform: uppercase; color: var(--dim); margin-top: 5px;
+    }
+
+    /* ─── SECTION ─── */
+    .section { padding: 6rem 0; border-bottom: 1px solid var(--border); }
+    .section:last-child { border-bottom: none; }
+
+    /* ─── BOARDS ─── */
+    .boards {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1px; background: var(--border); border: 1px solid var(--border);
+    }
+    .board { background: var(--surface); padding: 3rem; position: relative; overflow: hidden; }
+    .board-num {
+      position: absolute; bottom: -2rem; right: 1.5rem;
+      font-family: 'Barlow Condensed', sans-serif; font-weight: 800;
+      font-size: 10rem; line-height: 1; color: var(--border2);
+      pointer-events: none; user-select: none; letter-spacing: -0.05em;
+    }
+    .board-tag {
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim);
+      margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;
+    }
+    .board-tag::before { content: ''; width: 16px; height: 1px; background: var(--green2); }
+    h3 {
+      font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+      font-size: 1.9rem; text-transform: uppercase; color: var(--bright);
+      letter-spacing: 0.01em; margin-bottom: 1rem;
+    }
+    .board-body { color: var(--dim); font-size: 0.85rem; line-height: 1.75; margin-bottom: 1.5rem; }
+    .specs-list { list-style: none; margin-bottom: 1.75rem; }
+    .specs-list li {
+      font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--text);
+      padding: 0.4rem 0; border-bottom: 1px solid var(--border);
+      display: flex; gap: 0.75rem; align-items: baseline;
+    }
+    .specs-list li::before { content: '›'; color: var(--green2); flex-shrink: 0; }
+    .specs-list li:last-child { border-bottom: none; }
+    .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .tag { font-family: 'Space Mono', monospace; font-size: 0.6rem; padding: 3px 9px; border: 1px solid var(--border2); color: var(--dim); }
+    .tag.hi { border-color: var(--green2); color: var(--green); }
+
+    /* ─── CABLE ─── */
+    .cable-diagram {
+      border: 1px solid var(--border);
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      background: var(--border); gap: 1px;
+    }
+    .cable-node { background: var(--surface); padding: 2rem 2.25rem; }
+    .cable-node-title {
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.15em; text-transform: uppercase; color: var(--green); margin-bottom: 1rem;
+    }
+    .cable-items { list-style: none; }
+    .cable-items li {
+      font-family: 'Space Mono', monospace; font-size: 0.68rem;
+      color: var(--dim); padding: 0.3rem 0;
+      display: flex; gap: 0.5rem;
+    }
+    .cable-items li::before { content: '›'; color: var(--dim); flex-shrink: 0; }
+    .cable-pairs {
+      background: var(--panel); padding: 2rem 2.25rem;
+      display: flex; flex-direction: column; justify-content: center; gap: 2rem;
+      min-width: 300px;
+    }
+    .pair { display: flex; align-items: center; gap: 1rem; }
+    .pair-line { flex: 1; height: 1px; }
+    .pair-name { font-family: 'Space Mono', monospace; font-size: 0.65rem; white-space: nowrap; }
+    .pair-sub  { font-family: 'Space Mono', monospace; font-size: 0.57rem; color: var(--dim); margin-top: 2px; }
+
+    /* ─── TEST LOG ─── */
+    .test-table { border: 1px solid var(--border); }
+    .test-row {
+      display: grid; grid-template-columns: 4rem 2rem 1fr auto;
+      align-items: start; gap: 1.75rem;
+      padding: 1.5rem 1.75rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .test-row:last-child { border-bottom: none; }
+    .test-row:hover { background: var(--panel); }
+    .test-id { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--dim); padding-top: 2px; }
+    .test-icon { font-size: 1rem; padding-top: 1px; }
+    .test-title { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: var(--bright); margin-bottom: 0.5rem; }
+    .test-body  { font-size: 0.85rem; color: var(--dim); line-height: 1.65; }
+    .badge { font-family: 'Space Mono', monospace; font-size: 0.6rem; padding: 3px 10px; white-space: nowrap; align-self: start; }
+    .badge-fail { background: rgba(255,80,96,0.1); color: var(--red); border: 1px solid rgba(255,80,96,0.25); }
+    .badge-ok   { background: rgba(26,255,160,0.08); color: var(--green); border: 1px solid var(--green2); }
+
+    /* ─── PROTOCOL ─── */
+    .proto-grid {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 1px; background: var(--border); border: 1px solid var(--border);
+    }
+    .proto-cell { background: var(--surface); padding: 2rem 2.25rem; transition: background 0.15s; }
+    .proto-cell:hover { background: var(--panel); }
+    .proto-label { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.65rem; }
+    .proto-val   { font-family: 'Space Mono', monospace; font-size: 1rem; color: var(--green); margin-bottom: 0.75rem; line-height: 1.3; }
+    .proto-body  { font-size: 0.83rem; color: var(--dim); line-height: 1.65; }
+
+    /* ─── PGA ─── */
+    .pga-grid {
+      display: grid; grid-template-columns: repeat(7,1fr);
+      gap: 1px; background: var(--border); border: 1px solid var(--border);
+    }
+    .pga-cell { background: var(--surface); padding: 1.25rem 0.75rem; text-align: center; transition: background 0.15s; }
+    .pga-cell:hover { background: var(--panel); }
+    .pga-cell.hi { border: 1px solid var(--green2); background: rgba(26,255,160,0.04); }
+    .pga-key  { font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--dim); margin-bottom: 0.4rem; }
+    .pga-val  { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--green); }
+    .pga-note { font-family: 'Space Mono', monospace; font-size: 0.55rem; color: var(--green2); margin-top: 3px; }
+
+    /* ─── REPOS ─── */
+    .repo-list { border: 1px solid var(--border); }
+    .repo-row {
+      display: grid; grid-template-columns: 7rem 1fr 1.5rem;
+      align-items: center; gap: 2.25rem;
+      padding: 1.25rem 1.75rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+      color: inherit;
+    }
+    .repo-row:last-child { border-bottom: none; }
+    .repo-row:hover { background: var(--panel); }
+    .repo-row:hover .repo-name { color: var(--green); }
+    .repo-name { font-family: 'Space Mono', monospace; font-size: 0.72rem; color: var(--bright); transition: color 0.15s; }
+    .repo-lang { font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--dim); display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+    .repo-lang::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .lpy::before   { background: #3572A5; }
+    .lcpp::before  { background: #f34b7d; }
+    .lts::before   { background: #2b7489; }
+    .lmeta::before { background: #555; }
+    .repo-desc { font-size: 0.85rem; color: var(--dim); line-height: 1.65; }
+    .repo-desc code { font-family: 'Space Mono', monospace; font-size: 0.75em; color: var(--text); }
+    .repo-arrow { font-family: 'Space Mono', monospace; color: var(--dim); font-size: 0.75rem; }
+
+    /* ─── BANNER ─── */
+    .banner {
+      border-top: 1px solid var(--border);
+      position: relative; text-align: center;
+      padding: 8rem 2.5rem; overflow: hidden;
+    }
+    .banner::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(26,255,160,0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .banner-sub { color: var(--dim); font-size: 0.9rem; max-width: 480px; margin: 1.25rem auto 2.5rem; line-height: 1.8; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 2.5rem;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 1rem;
+    }
+    .ft-left { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--dim); font-style: italic; }
+    .ft-right { display: flex; gap: 2rem; font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--dim); }
+    .ft-right a { transition: color 0.15s; }
+    .ft-right a:hover { color: var(--green); }
+
+    /* ─── REVEAL ─── */
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.55s ease, transform 0.55s ease; }
+    .reveal.on { opacity: 1; transform: none; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; gap: 3rem; }
+      .boards { grid-template-columns: 1fr; }
+      .proto-grid { grid-template-columns: 1fr 1fr; }
+      .pga-grid { grid-template-columns: repeat(4,1fr); }
+      .stats-bar { grid-template-columns: repeat(3,1fr); }
+      .cable-diagram { grid-template-columns: 1fr; }
+      .cable-pairs { min-width: unset; }
+      .nav-links a:not(.gh) { display: none; }
+    }
+    @media (max-width: 600px) {
+      .proto-grid { grid-template-columns: 1fr; }
+      .stats-bar { grid-template-columns: 1fr 1fr; }
+      .pga-grid { grid-template-columns: repeat(3,1fr); }
+      .test-row { grid-template-columns: 3rem 1fr auto; }
+      .test-icon { display: none; }
+      .repo-row { grid-template-columns: 1fr auto; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <span class="wordmark">// rpi-seism</span>
+    <div class="nav-links">
+      <a href="#architecture">Hardware</a>
+      <a href="#testlog">Test Log</a>
+      <a href="#protocol">Protocol</a>
+      <a href="#repos">Repos</a>
+      <a href="https://github.com/rpi-seism" target="_blank" class="gh">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════ HERO ═══════════ -->
+<section>
+  <div class="hero">
+
+    <div class="reveal">
+      <div class="hero-tag">Open source seismograph · GPL-3.0</div>
+      <div class="page-title">
+        3-Axis<br/><span class="acc">Seismo</span><br/>graph
+      </div>
+      <p class="hero-sub">
+        A ground-up seismic monitoring system built around three GD-4.5 geophones,
+        a 24-bit ADS1256 ADC, and a Raspberry Pi. Full MiniSEED archiving,
+        ObsPy-compatible instrument response, real-time dashboard.
+      </p>
+      <div class="hero-btns">
+        <a href="https://github.com/rpi-seism" target="_blank" class="btn-p">◈ View on GitHub</a>
+        <a href="#architecture" class="btn-s">Explore Design</a>
+      </div>
+    </div>
+
+    <div class="osc-panel reveal">
+      <div class="osc-header">
+        <span class="osc-lbl">Live · AIN0/AIN1 — CH1</span>
+        <span class="osc-status"><span class="dot"></span> 100 SPS</span>
+      </div>
+      <div class="osc-body">
+        <canvas id="mainWave" height="110" style="width:100%;display:block;"></canvas>
+        <div class="osc-ch">
+          <span class="ch-id" style="color:var(--green)">CH1</span>
+          <canvas id="ch1" height="36" style="width:100%;display:block;"></canvas>
+        </div>
+        <div class="osc-ch">
+          <span class="ch-id" style="color:var(--amber)">CH2</span>
+          <canvas id="ch2" height="36" style="width:100%;display:block;"></canvas>
+        </div>
+        <div class="osc-ch">
+          <span class="ch-id" style="color:var(--blue)">CH3</span>
+          <canvas id="ch3" height="36" style="width:100%;display:block;"></canvas>
+        </div>
+      </div>
+      <div class="osc-foot">
+        <div class="ofc"><div class="ofc-k">ADC</div><div class="ofc-v">ADS1256 24-bit</div></div>
+        <div class="ofc"><div class="ofc-k">Link</div><div class="ofc-v">RS-485 250k</div></div>
+        <div class="ofc"><div class="ofc-k">Geophone</div><div class="ofc-v">GD-4.5 4.5Hz</div></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-cell"><div class="stat-val">3<sup>ch</sup></div><div class="stat-key">Geophone axes</div></div>
+  <div class="stat-cell"><div class="stat-val">24<sup>bit</sup></div><div class="stat-key">ADC resolution</div></div>
+  <div class="stat-cell"><div class="stat-val">100<sup>sps</sup></div><div class="stat-key">Default / configurable</div></div>
+  <div class="stat-cell"><div class="stat-val">250<sup>k</sup></div><div class="stat-key">RS-485 baud</div></div>
+  <div class="stat-cell"><div class="stat-val">4.5<sup>Hz</sup></div><div class="stat-key">Geophone resonance</div></div>
+</div>
+
+<!-- ═══════════ ARCHITECTURE ═══════════ -->
+<section class="section" id="architecture">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-tag">Hardware design</div>
+      <div class="sec-title">Two-Board<br/>Architecture</div>
+      <p class="sec-intro">All analog electronics co-located with the geophones to eliminate interference. Only clean digital RS-485 data travels over the Cat5/6 cable back to the host.</p>
+    </div>
+    <div class="boards reveal">
+      <div class="board">
+        <div class="board-tag">Sensor side</div>
+        <h3>Sensor PCB</h3>
+        <div class="board-num">01</div>
+        <p class="board-body">Co-located with the geophones to keep analog paths as short as possible. Differential instrumentation amplifiers feed a 24-bit ADS1256. An MCU samples all channels and streams framed packets over RS-485.</p>
+        <ul class="specs-list">
+          <li>3× differential inst. amp — gain ×100</li>
+          <li>ADS1256 — 24-bit, PGA up to ×64</li>
+          <li>Arduino / ESP32 / RP2040 MCU</li>
+          <li>THVD1406 RS-485 transceiver</li>
+          <li>12 V input, onboard regulation</li>
+          <li>JST XH2.54 geophone connectors</li>
+        </ul>
+        <div class="tags">
+          <span class="tag hi">ADS1256</span>
+          <span class="tag">INA gain ×100</span>
+          <span class="tag">THVD1406</span>
+          <span class="tag">12 V → 3.3/5 V</span>
+        </div>
+      </div>
+      <div class="board">
+        <div class="board-tag">Host side</div>
+        <h3>Host Interface</h3>
+        <div class="board-num">02</div>
+        <p class="board-body">Compact interface board sitting between the Cat5/6 cable and the Raspberry Pi. Handles RS-485 conversion, power injection, and remote sensor-board control via DTR/RTS signals.</p>
+        <ul class="specs-list">
+          <li>RS-485 → UART at ≥250k baud</li>
+          <li>MOSFET — remote power switch</li>
+          <li>MOSFET — remote MCU reset</li>
+          <li>DTR/RTS control lines</li>
+          <li>RJ45 + 12 V barrel jack input</li>
+          <li>USB-C to host (Raspberry Pi)</li>
+        </ul>
+        <div class="tags">
+          <span class="tag hi">RS-485 → UART</span>
+          <span class="tag">DTR/RTS</span>
+          <span class="tag">MOSFET PWR</span>
+          <span class="tag">RJ45</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ CABLE ═══════════ -->
+<div style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:6rem 0;">
+  <div class="wrap reveal">
+    <div class="sec-tag">Interconnect</div>
+    <div class="sec-title">Cat5/6 Cable<br/>Wiring</div>
+    <p class="sec-intro">Four pairs: two for RS-485 data, two paralleled for 12 V power delivery.</p>
+    <div class="cable-diagram">
+      <div class="cable-node">
+        <div class="cable-node-title">Sensor PCB</div>
+        <ul class="cable-items">
+          <li>3× GD-4.5 geophone</li>
+          <li>3× Inst. amp (gain ×100)</li>
+          <li>ADS1256 24-bit ADC</li>
+          <li>MCU (Arduino / ESP32)</li>
+          <li>THVD1406 RS-485 TX/RX</li>
+        </ul>
+      </div>
+      <div class="cable-pairs">
+        <div class="pair">
+          <div class="pair-line" style="background:var(--green)"></div>
+          <div><div class="pair-name" style="color:var(--green);font-family:'Space Mono',monospace;font-size:0.65rem;">Pair 1 / 2</div><div class="pair-sub">RS-485 data</div></div>
+          <div class="pair-line" style="background:var(--green)"></div>
+        </div>
+        <div class="pair">
+          <div class="pair-line" style="background:var(--amber)"></div>
+          <div><div class="pair-name" style="color:var(--amber);font-family:'Space Mono',monospace;font-size:0.65rem;">Pair 3 / 4</div><div class="pair-sub">12 V power (×2 parallel)</div></div>
+          <div class="pair-line" style="background:var(--amber)"></div>
+        </div>
+      </div>
+      <div class="cable-node" style="border-left:1px solid var(--border)">
+        <div class="cable-node-title">Host Interface</div>
+        <ul class="cable-items">
+          <li>RS-485 → UART</li>
+          <li>PWR MOSFET</li>
+          <li>12 V power inject</li>
+          <li>USB-C to Raspberry Pi</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ TEST LOG ═══════════ -->
+<section class="section" id="testlog">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-tag">Validation</div>
+      <div class="sec-title">Test Log</div>
+      <p class="sec-intro">Incremental hardware validation from first prototype to best configuration.</p>
+    </div>
+    <div class="test-table reveal">
+      <div class="test-row">
+        <span class="test-id">T-01</span>
+        <span class="test-icon" style="color:var(--red)">✕</span>
+        <div>
+          <div class="test-title">AD620 Module + Oscilloscope</div>
+          <div class="test-body">Geophone connected to AD620 module, powered from Pi 5 V rail. Offset trimmed to 2.5 V. Output clipped at ~3.8 V (non-rail-to-rail swing). Signal significantly noisier than raw geophone output due to flying wires and single-ended measurement.</div>
+        </div>
+        <span class="badge badge-fail">FAIL</span>
+      </div>
+      <div class="test-row">
+        <span class="test-id">T-02</span>
+        <span class="test-icon" style="color:var(--red)">✕</span>
+        <div>
+          <div class="test-title">AD620 + ADS1256 Single-Ended</div>
+          <div class="test-body">AD620 Vout → AIN0, GND → AGND. PGA=1, 30k SPS. Signal clipped below 0 V — AINCOM tied to GND via PCB via, not modifiable without desoldering. MiniSEED recording confirmed working. Clipping makes data unusable.</div>
+        </div>
+        <span class="badge badge-fail">FAIL</span>
+      </div>
+      <div class="test-row">
+        <span class="test-id">T-03</span>
+        <span class="test-icon" style="color:var(--green)">✓</span>
+        <div>
+          <div class="test-title">Geophones Directly into ADS1256 — Differential</div>
+          <div class="test-body">AD620 bypassed. Two geophones differential on AIN0/AIN1 and AIN2/AIN3. PGA=64, 2000 SPS internal, read via Arduino Nano at 100 SPS/ch, 250000 baud. Significantly cleaner signal. Negative values correct. Heartbeat watchdog implemented. PGA=64 alone insufficient for distant events — external gain stage required on final PCB.</div>
+        </div>
+        <span class="badge badge-ok">BEST</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ PROTOCOL ═══════════ -->
+<section class="section" style="background:var(--surface);border-top:1px solid var(--border);" id="protocol">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-tag">Firmware protocol</div>
+      <div class="sec-title">Data Link<br/>Protocol</div>
+      <p class="sec-intro">The serial protocol between the MCU and the Raspberry Pi acquisition daemon.</p>
+    </div>
+    <div class="proto-grid reveal">
+      <div class="proto-cell">
+        <div class="proto-label">Baud rate</div>
+        <div class="proto-val">250,000 bps</div>
+        <div class="proto-body">RS-485 over Cat5/6, reliable up to 50 m. Half-duplex, differential signalling.</div>
+      </div>
+      <div class="proto-cell">
+        <div class="proto-label">Packet frame</div>
+        <div class="proto-val">HDR · CH · DATA · CRC</div>
+        <div class="proto-body">Header, channel ID, raw 24-bit ADC value, checksum. Ensures integrity over the RS-485 link.</div>
+      </div>
+      <div class="proto-cell">
+        <div class="proto-label">Heartbeat watchdog</div>
+        <div class="proto-val">≤ 1 s timeout</div>
+        <div class="proto-body">Host sends a heartbeat each second. If absent, MCU halts the data stream automatically.</div>
+      </div>
+      <div class="proto-cell">
+        <div class="proto-label">Runtime config</div>
+        <div class="proto-val">Sent at connect</div>
+        <div class="proto-body">PGA, ADC data rate, MUX assignments, and output SPS sent by host at first connection — nothing hardcoded in firmware.</div>
+      </div>
+      <div class="proto-cell">
+        <div class="proto-label">Sample rate</div>
+        <div class="proto-val">100 SPS / ch *</div>
+        <div class="proto-body">Default, software-configurable at connect time. ADS1256 internal rate up to 30k SPS, decimated in firmware.<br/><span style="font-size:0.72em;color:var(--dim)">* no reflashing required</span></div>
+      </div>
+      <div class="proto-cell">
+        <div class="proto-label">Archive format</div>
+        <div class="proto-val">MiniSEED / SDS</div>
+        <div class="proto-body">SeisComp SDS archive on host. StationXML with GD-4.5 PAZ instrument response. ObsPy / SeisComP compatible.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ PGA ═══════════ -->
+<section class="section">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-tag">ADS1256 — VREF = 2.5 V</div>
+      <div class="sec-title">Input Range<br/>by PGA Setting</div>
+      <p class="sec-intro">External amplifier gain ×100 applied before the ADC. Absolute pin range: −100 mV &lt; AINx &lt; AVDD + 100 mV.</p>
+    </div>
+    <div class="pga-grid reveal">
+      <div class="pga-cell"><div class="pga-key">PGA × 1</div><div class="pga-val">± 5 V</div></div>
+      <div class="pga-cell"><div class="pga-key">PGA × 2</div><div class="pga-val">± 2.5 V</div></div>
+      <div class="pga-cell"><div class="pga-key">PGA × 4</div><div class="pga-val">± 1.25 V</div></div>
+      <div class="pga-cell"><div class="pga-key">PGA × 8</div><div class="pga-val">± 625 mV</div></div>
+      <div class="pga-cell"><div class="pga-key">PGA × 16</div><div class="pga-val">± 312 mV</div></div>
+      <div class="pga-cell"><div class="pga-key">PGA × 32</div><div class="pga-val">± 156 mV</div></div>
+      <div class="pga-cell hi"><div class="pga-key">PGA × 64</div><div class="pga-val">± 78 mV</div><div class="pga-note">max</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ REPOS ═══════════ -->
+<section class="section" id="repos">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-tag">Source code</div>
+      <div class="sec-title">Repositories</div>
+      <p class="sec-intro">Five repositories covering the full stack from MCU firmware to web frontend.</p>
+    </div>
+    <div class="repo-list reveal">
+      <a href="https://github.com/rpi-seism/stack"  target="_blank" class="repo-row"><div><div class="repo-name">stack</div><div class="repo-lang lmeta">meta</div></div><div class="repo-desc"><code>docker-compose.yml</code> and submodules. Deploys daemon, API and frontend in one command. Start here.</div><span class="repo-arrow">↗</span></a>
+      <a href="https://github.com/rpi-seism/reader" target="_blank" class="repo-row"><div><div class="repo-name">reader</div><div class="repo-lang lcpp">C++</div></div><div class="repo-desc">MCU firmware for Arduino/ESP32/RP2040. ADS1256 sampling over SPI, RS-485 at 250k baud. ADC gain, data rate and MUX are runtime-configurable — no reflashing needed.</div><span class="repo-arrow">↗</span></a>
+      <a href="https://github.com/rpi-seism/daemon" target="_blank" class="repo-row"><div><div class="repo-name">daemon</div><div class="repo-lang lpy">Python</div></div><div class="repo-desc">Acquisition daemon. RS-485 reader, SDS MiniSEED archiving, StationXML/PAZ response, STA/LTA earthquake detection, Telegram alerts with waveform plots, WebSocket live stream.</div><span class="repo-arrow">↗</span></a>
+      <a href="https://github.com/rpi-seism/api"    target="_blank" class="repo-row"><div><div class="repo-name">api</div><div class="repo-lang lpy">Python</div></div><div class="repo-desc">FastAPI archive browser. Serves historical MiniSEED data from the SDS archive. Raw counts or deconvolved output — nm/s, nm, nm/s².</div><span class="repo-arrow">↗</span></a>
+      <a href="https://github.com/rpi-seism/web"    target="_blank" class="repo-row"><div><div class="repo-name">web</div><div class="repo-lang lts">TypeScript</div></div><div class="repo-desc">Angular dashboard. Live 3-channel waveforms via WebSocket, real-time FFT spectrum, spectrogram waterfall, archive browser. Auto-reconnects on connection loss.</div><span class="repo-arrow">↗</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ BANNER ═══════════ -->
+<div class="banner">
+  <div class="wrap reveal" style="position:relative;">
+    <div class="sec-tag" style="justify-content:center;">Open hardware</div>
+    <div class="page-title" style="margin-bottom:1.25rem;">Fully<br/><span class="acc">Open</span><br/>Source</div>
+    <p class="banner-sub">Schematics, PCB layout files, firmware and host software — all published on GitHub. Designed for reproducibility and community contribution.</p>
+    <div style="display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;">
+      <a href="https://github.com/rpi-seism" target="_blank" class="btn-p">◈ GitHub Repository</a>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <span class="ft-left">// rpi-seism · Artegna, Friuli-Venezia Giulia · Italy · GPL-3.0</span>
+  <div class="ft-right">
+    <a href="https://github.com/rpi-seism/stack"  target="_blank">stack</a>
+    <a href="https://github.com/rpi-seism/reader" target="_blank">reader</a>
+    <a href="https://github.com/rpi-seism/daemon" target="_blank">daemon</a>
+    <a href="https://github.com/rpi-seism/api"    target="_blank">api</a>
+    <a href="https://github.com/rpi-seism/web"    target="_blank">web</a>
+  </div>
+</footer>
+
+<script>
+const chDefs = [
+  { id:'ch1', color:'#1affa0', freq:0.65, amp:0.52, noise:0.04 },
+  { id:'ch2', color:'#ffaa40', freq:0.48, amp:0.42, noise:0.05 },
+  { id:'ch3', color:'#40aaff', freq:0.88, amp:0.35, noise:0.035 },
+];
+
+function setup(el) {
+  const dpr = window.devicePixelRatio || 1;
+  el.width  = el.offsetWidth  * dpr;
+  el.height = el.offsetHeight * dpr;
+  const ctx = el.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return ctx;
+}
+
+function drawMain(el, t) {
+  if (!el || !el.offsetWidth) return;
+  const ctx = setup(el);
+  const W = el.offsetWidth, H = el.offsetHeight, mid = H / 2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#1c2a38'; ctx.lineWidth = 0.75;
+  for (let i = 1; i < 4; i++) { const y = H/4*i; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  for (let i = 1; i < 8; i++) { const x = W/8*i; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  ctx.save();
+  ctx.shadowColor = '#1affa0'; ctx.shadowBlur = 8;
+  ctx.strokeStyle = '#1affa0'; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let x = 0; x <= W; x++) {
+    const p = x/W;
+    const y = mid + Math.sin(p*14*Math.PI+t)*mid*0.3 + Math.sin(p*5*Math.PI+t*0.7)*mid*0.12 + (Math.random()-0.5)*mid*0.035;
+    x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+function drawCh(el, color, t, freq, amp, noise) {
+  if (!el || !el.offsetWidth) return;
+  const ctx = setup(el);
+  const W = el.offsetWidth, H = el.offsetHeight, mid = H/2;
+  ctx.clearRect(0,0,W,H);
+  ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = 5;
+  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 0; x <= W; x++) {
+    const p = x/W;
+    const y = mid + Math.sin(p*6*Math.PI*freq+t)*mid*amp + Math.sin(p*2*Math.PI*freq*3+t*1.3)*mid*amp*0.3 + (Math.random()-0.5)*noise*mid;
+    x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+let t = 0;
+function animate() {
+  t += 0.022;
+  drawMain(document.getElementById('mainWave'), t);
+  chDefs.forEach(ch => drawCh(document.getElementById(ch.id), ch.color, t, ch.freq, ch.amp, ch.noise));
+  requestAnimationFrame(animate);
+}
+animate();
+
+const obs = new IntersectionObserver(
+  entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('on'); }),
+  { threshold: 0.08 }
+);
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
